@@ -1311,10 +1311,9 @@ int editorFileWasModified(void) {
 }
 
 void handleSignal(int c) {
-  if (c == SIGSEGV) {
-    editorAtExit();
-    exit(1);
-  }
+  editorAtExit();
+  signal(SIGSEGV, SIG_DFL);
+  raise(c);
 }
 
 int main(int argc, char **argv) {
