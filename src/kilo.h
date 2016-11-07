@@ -47,7 +47,6 @@ typedef struct bufferConfig {
   int screenrows; /* Number of rows that we can show */
   int screencols; /* Number of cols that we can show */
   int numrows;    /* Number of rows */
-  int rawmode;    /* Is terminal raw mode enabled? */
   erow *row;      /* Rows */
   int dirty;      /* File modified but not saved. */
   char *filename; /* Currently open filename */
