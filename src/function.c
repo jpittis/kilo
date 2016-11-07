@@ -118,3 +118,7 @@ void saveAndQuit() {
   saveIgnoreError();
   quitWithPrompt();
 }
+
+void saveAll() {
+  editorSaveAll();
+}

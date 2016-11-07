@@ -96,7 +96,7 @@ static inline void ptrVectorDelete(ptrVector *vec, void *elem) {
             (vec->idx - idx) * sizeof(void *));
 }
 
-extern struct ptrVector openbuffers;
+extern struct ptrVector openBuffers;
 extern struct bufferConfig *buffer;
 
 enum DIRECTION {
@@ -255,7 +255,8 @@ bool editorOpen(char *filename);
 bufferConfig *editorFindBuffer(char *name);
 bool editorSwitchBuffer(char *);
 
-int editorSave();
+int editorSave(void);
+int editorSaveAll(void);
 
 void logmsg(char *fmt, ...);
 
