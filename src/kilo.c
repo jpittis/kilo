@@ -39,6 +39,7 @@
 
 #include <assert.h>
 #include <termios.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -1302,6 +1303,13 @@ int editorFileWasModified(void) {
     return buffer->dirty;
 }
 
+void handleSignal(int c) {
+  if (c == SIGSEGV) {
+    editorAtExit();
+    exit(0);
+  }
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr,"Usage: kilo <filename>\n");
@@ -1315,8 +1323,10 @@ int main(int argc, char **argv) {
     editorOpen(argv[1]);
     initUser();
     enableRawMode(STDIN_FILENO);
+    signal(SIGSEGV, handleSignal);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+
     while(1) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
