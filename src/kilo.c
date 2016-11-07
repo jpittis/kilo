@@ -39,6 +39,7 @@
 
 #include <assert.h>
 #include <termios.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -70,7 +71,14 @@ void editorSetStatusMessage(const char *fmt, ...);
 static struct termios orig_termios; /* In order to restore at exit.*/
 
 /* Called at exit to avoid remaining in raw mode. */
-void editorAtExit(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); }
+void editorAtExit(void) {
+  /* clear screen */
+  write(STDOUT_FILENO, "\x1b[2J", 6);
+  /* go home */
+  write(STDOUT_FILENO, "\x1b[H", 4);
+  /* turn off raw mode */
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
 
 /* Raw mode: 1960 magic shit. */
 int enableRawMode(int fd) {
@@ -1302,6 +1310,12 @@ int editorFileWasModified(void) {
     return buffer->dirty;
 }
 
+void handleSignal(int c) {
+  editorAtExit();
+  signal(c, SIG_DFL);
+  raise(c);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr,"Usage: kilo <filename>\n");
@@ -1315,8 +1329,10 @@ int main(int argc, char **argv) {
     editorOpen(argv[1]);
     initUser();
     enableRawMode(STDIN_FILENO);
+    signal(SIGSEGV, handleSignal);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+
     while(1) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
