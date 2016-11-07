@@ -69,26 +69,13 @@ void editorSetStatusMessage(const char *fmt, ...);
 
 static struct termios orig_termios; /* In order to restore at exit.*/
 
-void disableRawMode(int fd) {
-  int i;
-  for (i = 0; i < openBuffers.idx; ++i)
-    /* Don't even check the return value as it's too late. */
-    if (((bufferConfig *)openBuffers.data[i])->rawmode) {
-      tcsetattr(fd, TCSAFLUSH, &orig_termios);
-      buffer->rawmode = 0;
-    }
-}
-
 /* Called at exit to avoid remaining in raw mode. */
-void editorAtExit(void) {
-    disableRawMode(STDIN_FILENO);
-}
+void editorAtExit(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); }
 
 /* Raw mode: 1960 magic shit. */
 int enableRawMode(int fd) {
     struct termios raw;
 
-    if (buffer->rawmode) return 0; /* Already enabled. */
     if (!isatty(STDIN_FILENO)) goto fatal;
     atexit(editorAtExit);
     if (tcgetattr(fd,&orig_termios) == -1) goto fatal;
@@ -110,7 +97,6 @@ int enableRawMode(int fd) {
 
     /* put terminal in raw mode after flushing */
     if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
-    buffer->rawmode = 1;
     return 0;
 
 fatal:
