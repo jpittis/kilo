@@ -1312,7 +1312,7 @@ int editorFileWasModified(void) {
 
 void handleSignal(int c) {
   editorAtExit();
-  signal(SIGSEGV, SIG_DFL);
+  signal(c, SIG_DFL);
   raise(c);
 }
 
