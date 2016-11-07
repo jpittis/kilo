@@ -71,7 +71,14 @@ void editorSetStatusMessage(const char *fmt, ...);
 static struct termios orig_termios; /* In order to restore at exit.*/
 
 /* Called at exit to avoid remaining in raw mode. */
-void editorAtExit(void) { tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); }
+void editorAtExit(void) {
+  /* clear screen */
+  write(STDOUT_FILENO, "\x1b[2J", 6);
+  /* go home */
+  write(STDOUT_FILENO, "\x1b[H", 4);
+  /* turn off raw mode */
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
 
 /* Raw mode: 1960 magic shit. */
 int enableRawMode(int fd) {
@@ -1306,7 +1313,7 @@ int editorFileWasModified(void) {
 void handleSignal(int c) {
   if (c == SIGSEGV) {
     editorAtExit();
-    exit(0);
+    exit(1);
   }
 }
 
