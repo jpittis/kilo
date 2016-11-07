@@ -98,7 +98,7 @@ static inline void ptrVectorDelete(ptrVector *vec, void *elem) {
             (vec->idx - idx) * sizeof(void *));
 }
 
-extern struct ptrVector openBuffers;
+extern struct trie openBuffers;
 extern struct bufferConfig *buffer;
 
 enum DIRECTION {

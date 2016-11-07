@@ -58,8 +58,9 @@
 #include "init.h"
 #include "syntax_highlighter.h"
 #include "colon.h"
+#include "trie.h"
 
-struct ptrVector openBuffers;
+struct trie openBuffers;
 struct bufferConfig *buffer;
 
 FILE *logfile;
@@ -686,7 +687,7 @@ bool editorOpen(char *filename) {
     }
     buffer->screenrows -= 2; /* Get room for status bar. */
 
-    ptrVectorPushBack(&openBuffers, buffer);
+    trieAddKeyValue(&openBuffers, filename, buffer);
 
     buffer->dirty = 0;
     free(buffer->filename);
@@ -743,12 +744,18 @@ writeerr:
 }
 
 int editorSaveAll(void) {
+  bufferConfig *allBuffers[512];
+  int res = trieAccumulateValues(&openBuffers, (void **)allBuffers, 512);
+
+  if (res == -1)
+    return 1;
+
   int stat;
   bufferConfig *tmpBuf = buffer;
-  for (int i = 0; i < openBuffers.idx; ++i) {
-    buffer = (bufferConfig *)openBuffers.data[i];
+  for (int i = 0; i < res; ++i) {
+    buffer = allBuffers[i];
     bool saveStat = editorSave();
-    stat = stat | saveStat;
+    stat = stat || saveStat;
   }
   buffer = tmpBuf;
   return stat;
@@ -758,12 +765,16 @@ void editorQuit(int force) {
   if (force)
     exit(0);
 
-  for (int i = 0; i < openBuffers.idx; ++i) {
-    bufferConfig *config = (bufferConfig *)openBuffers.data[i];
-    if (config->dirty) {
+  bufferConfig *allBuffers[512];
+  int res = trieAccumulateValues(&openBuffers, (void **)allBuffers, 512);
+  if (res == -1)
+    return;
+
+  for (int i = 0; i < res; ++i) {
+    if (allBuffers[i]->dirty) {
       editorSetStatusMessage("WARNING!!! File '%s' has unsaved changes."
                              " Do you want to continue? (y/n)",
-                             config->filename);
+                             allBuffers[i]->filename);
 
       editorRefreshScreen();
       char c = editorReadKey(STDIN_FILENO);
@@ -1169,11 +1180,7 @@ void logmsg(char *fmt, ...) {
 /* ========================= Editor buffer handling  ======================== */
 
 bufferConfig *editorFindBuffer(char *name) {
-  int idx;
-  for (idx = 0; idx < openBuffers.idx; ++idx)
-    if (strcmp(name, ((bufferConfig *)openBuffers.data[idx])->filename) == 0)
-      return openBuffers.data[idx];
-  return NULL;
+  return trieLookup(&openBuffers, name);
 }
 
 bool editorSwitchBuffer(char *name) {
@@ -1321,8 +1328,6 @@ int main(int argc, char **argv) {
         fprintf(stderr,"Usage: kilo <filename>\n");
         exit(1);
     }
-
-    ptrVectorInit(&openBuffers);
 
     openLogFile(LOG_FILENAME);
     logmsg("editor is initializing...\n");
