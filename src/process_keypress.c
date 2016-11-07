@@ -8,12 +8,12 @@
 
 #define ENTER_MODE(NAME)                                                       \
   do {                                                                         \
-    E.mode = VM_##NAME;                                                        \
+    buffer->mode = VM_##NAME;                                                        \
     editorSetStatusMessage(#NAME);                                             \
   } while (0)
 
 static textObject editorParseTextObjectOverride(char override) {
-  if (E.selection_row != -1)
+  if (buffer->selection_row != -1)
     return editorRegionObject();
 
   int c = override ? override : editorReadKey(STDIN_FILENO);
@@ -75,8 +75,8 @@ void editorProcessKeypress(int fd) {
 
   int c = editorReadKey(fd);
 
-  if (E.mode == VM_NORMAL || E.mode == VM_VISUAL_CHAR ||
-      E.mode == VM_VISUAL_LINE) {
+  if (buffer->mode == VM_NORMAL || buffer->mode == VM_VISUAL_CHAR ||
+      buffer->mode == VM_VISUAL_LINE) {
     switch (c) {
     case ENTER: /* Enter */
       editorMoveCursor(DOWN);
@@ -93,8 +93,15 @@ void editorProcessKeypress(int fd) {
       break;
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
-      if (fn && handleColonFunction(fn))
-        editorSetStatusMessage("function '%s' not found", fn);
+      if (fn) {
+        char *arg = strchr(fn, ' ');
+        if (arg) {
+          *arg = '\0';
+          arg++;
+        }
+        if (handleColonFunction(fn, arg))
+          editorSetStatusMessage("function '%s' not found", fn);
+      }
       break;
     }
     case BACKSPACE: /* Backspace */
@@ -103,12 +110,12 @@ void editorProcessKeypress(int fd) {
       break;
     case PAGE_UP:
     case PAGE_DOWN:
-      if (c == PAGE_UP && E.cy != 0)
-        E.cy = 0;
-      else if (c == PAGE_DOWN && E.cy != E.screenrows - 1)
-        E.cy = E.screenrows - 1;
+      if (c == PAGE_UP && buffer->cy != 0)
+        buffer->cy = 0;
+      else if (c == PAGE_DOWN && buffer->cy != buffer->screenrows - 1)
+        buffer->cy = buffer->screenrows - 1;
       {
-        int times = E.screenrows;
+        int times = buffer->screenrows;
         while (times--)
           editorMoveCursor(c == PAGE_UP ? UP : DOWN);
       }
@@ -133,12 +140,12 @@ void editorProcessKeypress(int fd) {
       editorMoveCursor(RIGHT);
       break;
     case 'o':
-      editorInsertRow(E.cy + E.rowoff + 1, "", 0);
+      editorInsertRow(buffer->cy + buffer->rowoff + 1, "", 0);
       editorMoveCursor(DOWN);
       ENTER_MODE(INSERT);
       break;
     case 'O':
-      editorInsertRow(E.cy + E.rowoff, "", 0);
+      editorInsertRow(buffer->cy + buffer->rowoff, "", 0);
       ENTER_MODE(INSERT);
       break;
     case 'A':
@@ -159,28 +166,28 @@ void editorProcessKeypress(int fd) {
       editorDelChar();
       break;
     case 'v':
-      if (E.mode == VM_VISUAL_CHAR) {
+      if (buffer->mode == VM_VISUAL_CHAR) {
         ENTER_MODE(NORMAL);
-        E.selection_row = -1;
-        E.selection_offset = 0;
+        buffer->selection_row = -1;
+        buffer->selection_offset = 0;
         break;
       }
-      if (E.mode == VM_NORMAL) {
-        E.selection_row = E.rowoff + E.cy;
-        E.selection_offset = E.coloff + E.cx;
+      if (buffer->mode == VM_NORMAL) {
+        buffer->selection_row = buffer->rowoff + buffer->cy;
+        buffer->selection_offset = buffer->coloff + buffer->cx;
       }
       ENTER_MODE(VISUAL_CHAR);
       break;
     case 'V':
-      if (E.mode == VM_VISUAL_LINE) {
+      if (buffer->mode == VM_VISUAL_LINE) {
         ENTER_MODE(NORMAL);
-        E.selection_row = -1;
-        E.selection_offset = 0;
+        buffer->selection_row = -1;
+        buffer->selection_offset = 0;
         break;
       }
-      if (E.mode == VM_NORMAL) {
-        E.selection_row = E.rowoff + E.cy;
-        E.selection_offset = 0;
+      if (buffer->mode == VM_NORMAL) {
+        buffer->selection_row = buffer->rowoff + buffer->cy;
+        buffer->selection_offset = 0;
       }
       ENTER_MODE(VISUAL_LINE);
       break;
@@ -189,8 +196,8 @@ void editorProcessKeypress(int fd) {
       if (!badTextObject(obj))
         editorDeleteTextObject(obj);
 
-      E.selection_row = -1;
-      E.selection_offset = 0;
+      buffer->selection_row = -1;
+      buffer->selection_offset = 0;
       ENTER_MODE(NORMAL);
       break;
     }
@@ -212,9 +219,9 @@ void editorProcessKeypress(int fd) {
       /* Just refresh the line as side effect. */
       break;
     case ESC:
-      if (E.mode != VM_NORMAL) {
-        E.selection_row = -1;
-        E.selection_offset = 0;
+      if (buffer->mode != VM_NORMAL) {
+        buffer->selection_row = -1;
+        buffer->selection_offset = 0;
         ENTER_MODE(NORMAL);
       }
       break;
@@ -222,7 +229,7 @@ void editorProcessKeypress(int fd) {
       /* Unhandled input, ignore. */
       break;
     }
-  } else if (E.mode == VM_INSERT) {
+  } else if (buffer->mode == VM_INSERT) {
     switch (c) {
     case ARROW_UP: // noob
     case ARROW_DOWN:

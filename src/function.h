@@ -13,5 +13,6 @@ void quitWithPrompt();
 void quitForce();
 void saveIgnoreError();
 void saveAndQuit();
+void saveAll();
 
 #endif
