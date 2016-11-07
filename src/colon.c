@@ -71,9 +71,10 @@ int handleColonFunction(char *name, char *arg) {
   // A sketchy hack that relies on name and arg being right beside eachother in
   // memory.
   if (arg != NULL) {
-    name[strlen(name)] = ' ';
+    int length = strlen(name);
+    name[length] = ' ';
     addToHistory(name);
-    name[strlen(name)] = '\0';
+    name[length] = '\0';
   } else {
     addToHistory(name);
   }

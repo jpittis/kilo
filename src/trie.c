@@ -63,5 +63,8 @@ int trieAccumulateValues(struct trie *t, void **out, int outSize) {
 }
 
 void *trieLookup(struct trie *t, char *key) {
-  return triePartialLookup(t, key)->value;
+  struct trie *node = triePartialLookup(t, key);
+  if (node)
+    return node->value;
+  return NULL;
 }
