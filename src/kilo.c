@@ -710,7 +710,7 @@ bool editorOpen(char *filename) {
 }
 
 /* Save the current file on disk. Return 0 on success, 1 on error. */
-int editorSave() {
+int editorSave(void) {
     int len;
     char *buf = editorRowsToString(&len);
     int fd = open(buffer->filename,O_RDWR|O_CREAT,0644);
@@ -734,17 +734,38 @@ writeerr:
     return 1;
 }
 
+int editorSaveAll(void) {
+  int stat;
+  bufferConfig *tmpBuf = buffer;
+  for (int i = 0; i < openBuffers.idx; ++i) {
+    buffer = (bufferConfig *)openBuffers.data[i];
+    bool saveStat = editorSave();
+    stat = stat | saveStat;
+  }
+  buffer = tmpBuf;
+  return stat;
+}
+
 void editorQuit(int force) {
-  if (buffer->dirty && !force) {
-    editorSetStatusMessage("WARNING!!! File has unsaved changes."
-                           "Do you want to continue? (y/n)");
-    editorRefreshScreen();
-    char c = editorReadKey(STDIN_FILENO);
-    if (!(c == 'y' || c == 'Y')) {
-      editorSetStatusMessage("");
-      return;
+  if (force)
+    exit(0);
+
+  for (int i = 0; i < openBuffers.idx; ++i) {
+    bufferConfig *config = (bufferConfig *)openBuffers.data[i];
+    if (config->dirty) {
+      editorSetStatusMessage("WARNING!!! File '%s' has unsaved changes."
+                             " Do you want to continue? (y/n)",
+                             config->filename);
+
+      editorRefreshScreen();
+      char c = editorReadKey(STDIN_FILENO);
+      if (!(c == 'y' || c == 'Y')) {
+        editorSetStatusMessage("");
+        return;
+      }
     }
   }
+
   exit(0);
 }
 
