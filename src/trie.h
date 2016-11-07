@@ -13,5 +13,6 @@ struct trie *newTrie();
 void trieAddKeyValue(struct trie *t, char *key, void *value);
 void *trieLookup(struct trie *t, char *key);
 struct trie *triePartialLookup(struct trie *t, char *key);
+int trieAccumulateValues(struct trie *t, void **out, int outSize);
 
 #endif

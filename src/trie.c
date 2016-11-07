@@ -39,6 +39,29 @@ struct trie *triePartialLookup(struct trie *t, char *key) {
   }
 }
 
+int trieAccumulateValues(struct trie *t, void **out, int outSize) {
+  int off = 0;
+
+  ptrVector *stack = &(ptrVector){0, 0, 0};
+  ptrVectorInit(stack);
+  ptrVectorPushBack(stack, t);
+
+  while (stack->idx) {
+    struct trie *elem = (struct trie *)ptrVectorPopBack(stack);
+    for (int i = 0; i < CHAR_MAX; ++i) {
+      if (elem->next[i]) {
+        out[off++] = elem->value;
+        if (off == outSize)
+          return -1;
+        ptrVectorPushBack(stack, elem->next[i]);
+      }
+    }
+  }
+
+  ptrVectorDestroy(stack);
+  return off;
+}
+
 void *trieLookup(struct trie *t, char *key) {
   return triePartialLookup(t, key)->value;
 }
