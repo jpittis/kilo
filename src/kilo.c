@@ -974,6 +974,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
 }
 
 char *editorReadStringFromStatusBar(char *prefix) {
+  int history = -1;
   int init_offset = strlen(prefix);
   editorSetStatusMessage(prefix);
 
@@ -1036,6 +1037,61 @@ char *editorReadStringFromStatusBar(char *prefix) {
       str = strcat(str, autocomplete);
       endpos = endpos + autolen;
       inspos = endpos;
+      buffer->cx = inspos + init_offset;
+      break;
+    }
+
+    case ARROW_UP: {
+      // You can't use history when you've arlready typed something.
+      if (history == -1 && strlen(str) > 0) {
+        break;
+      }
+      char *hist = getHistoryAt(history + 1);
+      if (hist == NULL) {
+        break;
+      }
+      history++;
+
+      // Copy the history string into the buffer.
+      int len = strlen(hist);
+      while (len + 1 > bufsz) {
+        str = realloc(str, bufsz *= 2);
+      }
+      strcpy(str, hist);
+      endpos = len;
+      inspos = endpos;
+      buffer->cx = inspos + init_offset;
+      break;
+    }
+
+    case ARROW_DOWN: {
+      if (history == 0) {
+        str[0] = '\0';
+        endpos = 0;
+        inspos = endpos;
+        buffer->cx = inspos + init_offset;
+        history--;
+        break;
+      } else if (history == -1) {
+        break;
+      }
+
+      char *hist = getHistoryAt(history - 1);
+      if (hist == NULL) {
+        break;
+      }
+      history--;
+
+      // Copy the history string into the buffer.
+      int len = strlen(hist);
+      while (len + 1 > bufsz) {
+        str = realloc(str, bufsz *= 2);
+      }
+      strcpy(str, hist);
+      endpos = len;
+      inspos = endpos;
+      buffer->cx = inspos + init_offset;
+
       break;
     }
 
@@ -1044,8 +1100,6 @@ char *editorReadStringFromStatusBar(char *prefix) {
     case CTRL_S:
     case PAGE_UP:
     case PAGE_DOWN:
-    case ARROW_UP:
-    case ARROW_DOWN:
       goto fail;
 
     default:
