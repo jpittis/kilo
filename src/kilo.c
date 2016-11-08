@@ -994,6 +994,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
 
 char *editorReadStringFromStatusBar(char *prefix) {
   int history = -1;
+
   int init_offset = strlen(prefix);
   editorSetStatusMessage(prefix);
 
@@ -1044,8 +1045,19 @@ char *editorReadStringFromStatusBar(char *prefix) {
       }
       break;
     case TAB: {
+      struct trie *t;
+      char *toSearch;
+      /* FIXME: This is a horrible hack! */
+      if (str[0] == 'b' && str[1] == ' ') {
+        t = &openBuffers;
+        toSearch = str + 2;
+      } else {
+        t = &colonFunctions;
+        toSearch = str;
+      }
+
       str[endpos] = '\0';
-      char *autocomplete = lookupPartialColonFunction(str);
+      char *autocomplete = trieLookupPartialText(t, toSearch);
       if (autocomplete == NULL) {
         break;
       }

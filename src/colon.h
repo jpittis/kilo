@@ -3,6 +3,8 @@
 
 #define HISTORY_SIZE 5
 
+extern struct trie colonFunctions;
+
 typedef void colonFunction();
 typedef _Bool unaryColonFunction(char *);
 

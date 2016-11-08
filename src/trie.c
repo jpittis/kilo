@@ -68,3 +68,42 @@ void *trieLookup(struct trie *t, char *key) {
     return node->value;
   return NULL;
 }
+
+char *trieLookupPartialText(struct trie *begin, char *partialName) {
+  struct trie *t = triePartialLookup(begin, partialName);
+  if (t == NULL) {
+    return NULL;
+  }
+
+  int i, found;
+
+  int bufsz = 8;
+  int len = 0;
+  char *buf = malloc(bufsz);
+
+  for (;;) {
+    if (t->value != NULL) {
+      goto done;
+    }
+    found = -1;
+    for (i = 0; i < CHAR_MAX; i++) {
+      if (t->next[i] != NULL) {
+        if (found != -1) {
+          // There are multiple possible branches in the trie so return the
+          // current location.
+          goto done;
+        }
+        found = i;
+      }
+    }
+    t = t->next[found];
+    if (len + 1 >= bufsz) { // leave room for a null byte
+      buf = realloc(buf, bufsz *= 2);
+    }
+    buf[len++] = found;
+  }
+
+ done:
+  buf[len] = '\0';
+  return buf;
+}
