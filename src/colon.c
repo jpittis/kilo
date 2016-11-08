@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 
 static char* history[HISTORY_SIZE];
 
@@ -40,10 +41,21 @@ int colonCompleteCallback(char **strPtr, int bufsz) {
 
   char *space = parseColonString(str);
   if (space) {
-    bool cond = strcmp("b", str) == 0;
+    bool isBuffer = strcmp("b", str) == 0;
+    bool isOpen = strcmp("e", str) == 0;
     *(space - 1) = ' ';
-    if (cond) {
+    if (isBuffer) {
       t = &openBuffers;
+      toSearch = space;
+    } else if (isOpen) {
+      DIR *dir;
+      dir = opendir(".");
+      struct dirent *entry;
+      if (!dir)
+        return bufsz;
+      t = newTrie();
+      while ((entry = readdir(dir)))
+        trieAddKeyValue(t, entry->d_name, (void *)1);
       toSearch = space;
     } else
       return bufsz;
@@ -57,8 +69,7 @@ int colonCompleteCallback(char **strPtr, int bufsz) {
 
   char *autocomplete = trieLookupPartialText(t, toSearch);
   if (!autocomplete) {
-    if (space)
-      return bufsz;
+    return bufsz;
   }
 
   int autolen = strlen(autocomplete);
