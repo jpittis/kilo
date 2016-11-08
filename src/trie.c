@@ -12,6 +12,15 @@ struct trie *newTrie() {
   return t;
 }
 
+void destroyTrie(struct trie *t, bool destroyValue) {
+  for (int i = 0; i < CHAR_MAX; ++i)
+    if (t->next[i])
+      destroyTrie(t->next[i], destroyValue);
+  if (destroyValue)
+    free(t->value);
+  free(t);
+}
+
 void trieAddKeyValue(struct trie *t, char *key, void *value) {
   struct trie *n = t->next[(int)*key];
   if (n == NULL) {

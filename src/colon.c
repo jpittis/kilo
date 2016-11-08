@@ -37,6 +37,7 @@ char *parseColonString(char *inp) {
 int colonCompleteCallback(char **strPtr, int bufsz) {
   char *str = *strPtr;
   struct trie *t;
+  bool shouldDestroyTrie = false;
   char *toSearch;
 
   char *space = parseColonString(str);
@@ -48,12 +49,12 @@ int colonCompleteCallback(char **strPtr, int bufsz) {
       t = &openBuffers;
       toSearch = space;
     } else if (isOpen) {
-      DIR *dir;
-      dir = opendir(".");
-      struct dirent *entry;
+      DIR *dir = opendir(".");
       if (!dir)
         return bufsz;
       t = newTrie();
+      shouldDestroyTrie = true;
+      struct dirent *entry;
       while ((entry = readdir(dir)))
         trieAddKeyValue(t, entry->d_name, (void *)1);
       toSearch = space;
@@ -68,6 +69,8 @@ int colonCompleteCallback(char **strPtr, int bufsz) {
   }
 
   char *autocomplete = trieLookupPartialText(t, toSearch);
+  if (shouldDestroyTrie)
+    destroyTrie(t, false);
   if (!autocomplete) {
     return bufsz;
   }
