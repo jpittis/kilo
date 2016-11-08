@@ -79,7 +79,7 @@ static inline void ptrVectorPushBack(ptrVector *vec, void *elem) {
 static inline void *ptrVectorPopBack(ptrVector *vec) {
   if (vec->idx == 0)
     return NULL;
-  return vec->data[vec->idx--];
+  return vec->data[--vec->idx];
 }
 
 /* Linear search: somethimes you gotta do it! */

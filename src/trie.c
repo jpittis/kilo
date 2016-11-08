@@ -50,7 +50,7 @@ int trieAccumulateValues(struct trie *t, void **out, int outSize) {
     struct trie *elem = (struct trie *)ptrVectorPopBack(stack);
     for (int i = 0; i < CHAR_MAX; ++i) {
       if (elem->next[i]) {
-        out[off++] = elem->value;
+        out[off++] = elem->next[i];
         if (off == outSize)
           return -1;
         ptrVectorPushBack(stack, elem->next[i]);
