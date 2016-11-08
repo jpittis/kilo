@@ -992,7 +992,8 @@ void editorSetStatusMessage(const char *fmt, ...) {
     buffer->statusmsg_time = time(NULL);
 }
 
-char *editorReadStringFromStatusBar(char *prefix) {
+char *editorReadStringFromStatusBar(char *prefix,
+                                    autoCompleteCallback *autoCompleter) {
   int history = -1;
 
   int init_offset = strlen(prefix);
@@ -1045,33 +1046,12 @@ char *editorReadStringFromStatusBar(char *prefix) {
       }
       break;
     case TAB: {
-      struct trie *t;
-      char *toSearch;
-      /* FIXME: This is a horrible hack! */
-      if (str[0] == 'b' && str[1] == ' ') {
-        t = &openBuffers;
-        toSearch = str + 2;
-      } else {
-        t = &colonFunctions;
-        toSearch = str;
-      }
-
-      str[endpos] = '\0';
-      char *autocomplete = trieLookupPartialText(t, toSearch);
-      if (autocomplete == NULL) {
-        break;
-      }
-      int autolen = strlen(autocomplete);
-      while (endpos + autolen >= bufsz) {
-        str = realloc(str, bufsz *= 2);
-      }
-      str = strcat(str, autocomplete);
-      endpos = endpos + autolen;
+      bufsz = autoCompleter(&str, bufsz);
+      endpos = strlen(str);
       inspos = endpos;
       buffer->cx = inspos + init_offset;
       break;
     }
-
     case ARROW_UP: {
       // You can't use history when you've arlready typed something.
       if (history == -1 && strlen(str) > 0) {

@@ -24,22 +24,62 @@ void addToHistory(char *str) {
   history[0] = added;
 }
 
-int handleColonFunction(char *name, char *arg) {
-  // A sketchy hack that relies on name and arg being right beside eachother in
-  // memory.
-  if (arg != NULL) {
-    int length = strlen(name);
-    name[length] = ' ';
-    addToHistory(name);
-    name[length] = '\0';
-  } else {
-    addToHistory(name);
+char *parseColonString(char *inp) {
+  char *space = strchr(inp, ' ');
+  if (space) {
+    *space = '\0';
+    ++space;
   }
+  return space;
+}
+
+int colonCompleteCallback(char **strPtr, int bufsz) {
+  char *str = *strPtr;
+  struct trie *t;
+  char *toSearch;
+
+  char *space = parseColonString(str);
+  if (space) {
+    bool cond = strcmp("b", str) == 0;
+    *(space - 1) = ' ';
+    if (cond) {
+      t = &openBuffers;
+      toSearch = space;
+    } else
+      return bufsz;
+  } else if (!space) {
+    t = &colonFunctions;
+    toSearch = str;
+  } else {
+    /* No possible completion. */
+    return bufsz;
+  }
+
+  char *autocomplete = trieLookupPartialText(t, toSearch);
+  if (!autocomplete) {
+    if (space)
+      return bufsz;
+  }
+
+  int autolen = strlen(autocomplete);
+  int origlen = strlen(str);
+  while (autolen + origlen + 1 > bufsz)
+    str = realloc(str, bufsz *= 2);
+  strcpy(str + origlen, autocomplete);
+  *strPtr = str;
+
+  return bufsz;
+}
+
+int handleColonFunction(char *name) {
+  addToHistory(name);
+
+  char *space = parseColonString(name);
 
   void *func = trieLookup(&colonFunctions, name);
   if (((ptrdiff_t)func) & 0x1) {
     ptrdiff_t unmask = (ptrdiff_t)func ^ 0x1;
-    ((unaryColonFunction *)(void *)unmask)(arg);
+    ((unaryColonFunction *)(void *)unmask)(space);
     return 0;
   } else if (func) {
     ((colonFunction *)func)();
