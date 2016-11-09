@@ -4,53 +4,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 
 static char* history[HISTORY_SIZE];
 
-static struct trie colonFunctions;
-
-char *lookupPartialColonFunction(char *partialName) {
-  struct trie *t = triePartialLookup(&colonFunctions, partialName);
-  if (t == NULL) {
-    return NULL;
-  }
-
-  int i, found;
-
-  int bufsz = 8;
-  int len = 0;
-  char *buf = malloc(bufsz);
-
-  for (;;) {
-    if (t->value != NULL) {
-      goto done;
-    }
-    found = -1;
-    for (i = 0; i < CHAR_MAX; i++) {
-      if (t->next[i] != NULL) {
-        if (found != -1) {
-          // There are multiple possible branches in the trie so return the
-          // current location.
-          goto done;
-        }
-        found = i;
-      }
-    }
-    t = t->next[found];
-    if (len + 1 >= bufsz) { // leave room for a null byte
-      buf = realloc(buf, bufsz *= 2);
-    }
-    buf[len++] = found;
-  }
-
-done:
-  buf[len] = '\0';
-  return buf;
-}
-
-void *lookupColonFunction(char *name) {
-  return trieLookup(&colonFunctions, name);
-}
+struct trie colonFunctions;
 
 void addToHistory(char *str) {
   int len = strlen(str);
@@ -67,22 +25,75 @@ void addToHistory(char *str) {
   history[0] = added;
 }
 
-int handleColonFunction(char *name, char *arg) {
-  // A sketchy hack that relies on name and arg being right beside eachother in
-  // memory.
-  if (arg != NULL) {
-    name[strlen(name)] = ' ';
-    addToHistory(name);
-    name[strlen(name)] = '\0';
+char *parseColonString(char *inp) {
+  char *space = strchr(inp, ' ');
+  if (space) {
+    *space = '\0';
+    ++space;
+  }
+  return space;
+}
+
+int colonCompleteCallback(char **strPtr, int bufsz) {
+  char *str = *strPtr;
+  struct trie *t;
+  bool shouldDestroyTrie = false;
+  char *toSearch;
+
+  char *space = parseColonString(str);
+  if (space) {
+    bool isBuffer = strcmp("b", str) == 0;
+    bool isOpen = strcmp("e", str) == 0;
+    *(space - 1) = ' ';
+    if (isBuffer) {
+      t = &openBuffers;
+      toSearch = space;
+    } else if (isOpen) {
+      DIR *dir = opendir(".");
+      if (!dir)
+        return bufsz;
+      t = newTrie();
+      shouldDestroyTrie = true;
+      struct dirent *entry;
+      while ((entry = readdir(dir)))
+        trieAddKeyValue(t, entry->d_name, (void *)1);
+      toSearch = space;
+    } else
+      return bufsz;
+  } else if (!space) {
+    t = &colonFunctions;
+    toSearch = str;
   } else {
-    addToHistory(name);
+    /* No possible completion. */
+    return bufsz;
   }
 
-  void *func = lookupColonFunction(name);
-  logmsg("retreiving: %s: %p\n", name, func);
+  char *autocomplete = trieLookupPartialText(t, toSearch);
+  if (shouldDestroyTrie)
+    destroyTrie(t, false);
+  if (!autocomplete) {
+    return bufsz;
+  }
+
+  int autolen = strlen(autocomplete);
+  int origlen = strlen(str);
+  while (autolen + origlen + 1 > bufsz)
+    str = realloc(str, bufsz *= 2);
+  strcpy(str + origlen, autocomplete);
+  *strPtr = str;
+
+  return bufsz;
+}
+
+int handleColonFunction(char *name) {
+  addToHistory(name);
+
+  char *space = parseColonString(name);
+
+  void *func = trieLookup(&colonFunctions, name);
   if (((ptrdiff_t)func) & 0x1) {
     ptrdiff_t unmask = (ptrdiff_t)func ^ 0x1;
-    ((unaryColonFunction *)(void *)unmask)(arg);
+    ((unaryColonFunction *)(void *)unmask)(space);
     return 0;
   } else if (func) {
     ((colonFunction *)func)();
@@ -100,13 +111,11 @@ char *getHistoryAt(int i) {
 }
 
 void registerColonFunction(char *name, colonFunction *func) {
-  logmsg("registering %s: %p\n", name, func);
   trieAddKeyValue(&colonFunctions, name, (void *)func);
 }
 
 void registerColonFunctionWithArg(char *name, unaryColonFunction *func) {
   /* Tag pointer as taking an argument */
   ptrdiff_t mask = (ptrdiff_t)func | 0x1;
-  logmsg("registering arg func %s: %p\n", name, func);
   trieAddKeyValue(&colonFunctions, name, (void *)mask);
 }

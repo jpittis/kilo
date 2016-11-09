@@ -68,6 +68,8 @@ static inline void ptrVectorInit(ptrVector *vec) {
   vec->idx = 0;
 }
 
+static inline void ptrVectorDestroy(ptrVector *vec) { free(vec->data); }
+
 static inline void ptrVectorPushBack(ptrVector *vec, void *elem) {
   if (vec->idx == vec->cap)
     vec->data = realloc(vec->data, vec->cap *= 2);
@@ -77,7 +79,7 @@ static inline void ptrVectorPushBack(ptrVector *vec, void *elem) {
 static inline void *ptrVectorPopBack(ptrVector *vec) {
   if (vec->idx == 0)
     return NULL;
-  return vec->data[vec->idx--];
+  return vec->data[--vec->idx];
 }
 
 /* Linear search: somethimes you gotta do it! */
@@ -96,7 +98,7 @@ static inline void ptrVectorDelete(ptrVector *vec, void *elem) {
             (vec->idx - idx) * sizeof(void *));
 }
 
-extern struct ptrVector openBuffers;
+extern struct trie openBuffers;
 extern struct bufferConfig *buffer;
 
 enum DIRECTION {
@@ -238,7 +240,8 @@ void editorRowDelChar(erow *row, int at);
 void editorInsertChar(int c);
 void editorInsertNewline(void);
 void editorDelChar();
-char *editorReadStringFromStatusBar(char *prefix);
+typedef int autoCompleteCallback(char **str, int bufsz);
+char *editorReadStringFromStatusBar(char *prefix, autoCompleteCallback *cb);
 void editorMoveCursorToRowEnd(void);
 bool editorMoveCursorToFirst(char c);
 bool editorIsPointInRegion(int x, int y);

@@ -12,6 +12,15 @@ struct trie *newTrie() {
   return t;
 }
 
+void destroyTrie(struct trie *t, bool destroyValue) {
+  for (int i = 0; i < CHAR_MAX; ++i)
+    if (t->next[i])
+      destroyTrie(t->next[i], destroyValue);
+  if (destroyValue)
+    free(t->value);
+  free(t);
+}
+
 void trieAddKeyValue(struct trie *t, char *key, void *value) {
   struct trie *n = t->next[(int)*key];
   if (n == NULL) {
@@ -39,6 +48,71 @@ struct trie *triePartialLookup(struct trie *t, char *key) {
   }
 }
 
+int trieAccumulateValues(struct trie *t, void **out, int outSize) {
+  int off = 0;
+
+  ptrVector *stack = &(ptrVector){0, 0, 0};
+  ptrVectorInit(stack);
+  ptrVectorPushBack(stack, t);
+
+  while (stack->idx) {
+    struct trie *elem = (struct trie *)ptrVectorPopBack(stack);
+    for (int i = 0; i < CHAR_MAX; ++i) {
+      if (elem->next[i]) {
+        out[off++] = elem->next[i];
+        if (off == outSize)
+          return -1;
+        ptrVectorPushBack(stack, elem->next[i]);
+      }
+    }
+  }
+
+  ptrVectorDestroy(stack);
+  return off;
+}
+
 void *trieLookup(struct trie *t, char *key) {
-  return triePartialLookup(t, key)->value;
+  struct trie *node = triePartialLookup(t, key);
+  if (node)
+    return node->value;
+  return NULL;
+}
+
+char *trieLookupPartialText(struct trie *begin, char *partialName) {
+  struct trie *t = triePartialLookup(begin, partialName);
+  if (t == NULL) {
+    return NULL;
+  }
+
+  int i, found;
+
+  int bufsz = 8;
+  int len = 0;
+  char *buf = malloc(bufsz);
+
+  for (;;) {
+    if (t->value != NULL) {
+      goto done;
+    }
+    found = -1;
+    for (i = 0; i < CHAR_MAX; i++) {
+      if (t->next[i] != NULL) {
+        if (found != -1) {
+          // There are multiple possible branches in the trie so return the
+          // current location.
+          goto done;
+        }
+        found = i;
+      }
+    }
+    t = t->next[found];
+    if (len + 1 >= bufsz) { // leave room for a null byte
+      buf = realloc(buf, bufsz *= 2);
+    }
+    buf[len++] = found;
+  }
+
+ done:
+  buf[len] = '\0';
+  return buf;
 }

@@ -58,8 +58,9 @@
 #include "init.h"
 #include "syntax_highlighter.h"
 #include "colon.h"
+#include "trie.h"
 
-struct ptrVector openBuffers;
+struct trie openBuffers;
 struct bufferConfig *buffer;
 
 FILE *logfile;
@@ -686,7 +687,7 @@ bool editorOpen(char *filename) {
     }
     buffer->screenrows -= 2; /* Get room for status bar. */
 
-    ptrVectorPushBack(&openBuffers, buffer);
+    trieAddKeyValue(&openBuffers, filename, buffer);
 
     buffer->dirty = 0;
     free(buffer->filename);
@@ -743,12 +744,18 @@ writeerr:
 }
 
 int editorSaveAll(void) {
+  bufferConfig *allBuffers[512];
+  int res = trieAccumulateValues(&openBuffers, (void **)allBuffers, 512);
+
+  if (res == -1)
+    return 1;
+
   int stat;
   bufferConfig *tmpBuf = buffer;
-  for (int i = 0; i < openBuffers.idx; ++i) {
-    buffer = (bufferConfig *)openBuffers.data[i];
+  for (int i = 0; i < res; ++i) {
+    buffer = allBuffers[i];
     bool saveStat = editorSave();
-    stat = stat | saveStat;
+    stat = stat || saveStat;
   }
   buffer = tmpBuf;
   return stat;
@@ -758,12 +765,16 @@ void editorQuit(int force) {
   if (force)
     exit(0);
 
-  for (int i = 0; i < openBuffers.idx; ++i) {
-    bufferConfig *config = (bufferConfig *)openBuffers.data[i];
-    if (config->dirty) {
+  bufferConfig *allBuffers[512];
+  int res = trieAccumulateValues(&openBuffers, (void **)allBuffers, 512);
+  if (res == -1)
+    return;
+
+  for (int i = 0; i < res; ++i) {
+    if (allBuffers[i]->dirty) {
       editorSetStatusMessage("WARNING!!! File '%s' has unsaved changes."
                              " Do you want to continue? (y/n)",
-                             config->filename);
+                             allBuffers[i]->filename);
 
       editorRefreshScreen();
       char c = editorReadKey(STDIN_FILENO);
@@ -981,8 +992,10 @@ void editorSetStatusMessage(const char *fmt, ...) {
     buffer->statusmsg_time = time(NULL);
 }
 
-char *editorReadStringFromStatusBar(char *prefix) {
+char *editorReadStringFromStatusBar(char *prefix,
+                                    autoCompleteCallback *autoCompleter) {
   int history = -1;
+
   int init_offset = strlen(prefix);
   editorSetStatusMessage(prefix);
 
@@ -1033,22 +1046,12 @@ char *editorReadStringFromStatusBar(char *prefix) {
       }
       break;
     case TAB: {
-      str[endpos] = '\0';
-      char *autocomplete = lookupPartialColonFunction(str);
-      if (autocomplete == NULL) {
-        break;
-      }
-      int autolen = strlen(autocomplete);
-      while (endpos + autolen >= bufsz) {
-        str = realloc(str, bufsz *= 2);
-      }
-      str = strcat(str, autocomplete);
-      endpos = endpos + autolen;
+      bufsz = autoCompleter(&str, bufsz);
+      endpos = strlen(str);
       inspos = endpos;
       buffer->cx = inspos + init_offset;
       break;
     }
-
     case ARROW_UP: {
       // You can't use history when you've arlready typed something.
       if (history == -1 && strlen(str) > 0) {
@@ -1169,11 +1172,7 @@ void logmsg(char *fmt, ...) {
 /* ========================= Editor buffer handling  ======================== */
 
 bufferConfig *editorFindBuffer(char *name) {
-  int idx;
-  for (idx = 0; idx < openBuffers.idx; ++idx)
-    if (strcmp(name, ((bufferConfig *)openBuffers.data[idx])->filename) == 0)
-      return openBuffers.data[idx];
-  return NULL;
+  return trieLookup(&openBuffers, name);
 }
 
 bool editorSwitchBuffer(char *name) {
@@ -1321,8 +1320,6 @@ int main(int argc, char **argv) {
         fprintf(stderr,"Usage: kilo <filename>\n");
         exit(1);
     }
-
-    ptrVectorInit(&openBuffers);
 
     openLogFile(LOG_FILENAME);
     logmsg("editor is initializing...\n");
